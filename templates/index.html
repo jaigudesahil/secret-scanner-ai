@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SecretScan — Secrets Detection Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0b0d12;
+    --surface: #10141e;
+    --surface2: #161b27;
+    --border: rgba(255,255,255,0.07);
+    --border-accent: rgba(0,255,136,0.25);
+    --text: #e8eaf0;
+    --muted: #5a6070;
+    --green: #00ff88;
+    --green-dim: rgba(0,255,136,0.12);
+    --green-mid: rgba(0,255,136,0.35);
+    --red: #ff4560;
+    --red-dim: rgba(255,69,96,0.12);
+    --orange: #ff9b3d;
+    --orange-dim: rgba(255,155,61,0.12);
+    --yellow: #ffd166;
+    --yellow-dim: rgba(255,209,102,0.1);
+    --blue: #4da6ff;
+    --blue-dim: rgba(77,166,255,0.1);
+    --purple: #b97fff;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 40% at 50% -10%, rgba(0,255,136,0.05) 0%, transparent 70%),
+      repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.015) 40px),
+      repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.015) 40px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page { position: relative; z-index: 1; max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+  /* ── Header ── */
+  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 3rem; }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-icon {
+    width: 38px; height: 38px;
+    background: var(--green-dim);
+    border: 1px solid var(--green-mid);
+    border-radius: var(--radius);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .logo-text { font-family: var(--mono); font-size: 1rem; font-weight: 600; letter-spacing: 0.04em; }
+  .logo-text span { color: var(--green); }
+  .logo-sub { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
+  .version-badge {
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    border: 1px solid var(--border); border-radius: 20px; padding: 4px 12px;
+    background: var(--surface);
+  }
+
+  /* ── Hero ── */
+  .hero { margin-bottom: 2.5rem; }
+  .hero h1 {
+    font-size: clamp(1.6rem, 4vw, 2.4rem);
+    font-weight: 300;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    margin-bottom: 0.6rem;
+  }
+  .hero h1 strong { font-weight: 600; color: var(--green); }
+  .hero p { font-size: 0.95rem; color: var(--muted); max-width: 560px; line-height: 1.7; }
+
+  /* ── Upload Zone ── */
+  .upload-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 2rem;
+    margin-bottom: 2rem;
+    transition: border-color 0.2s;
+  }
+  .upload-card.dragover { border-color: var(--green); background: rgba(0,255,136,0.03); }
+
+  .drop-zone {
+    border: 1.5px dashed rgba(255,255,255,0.12);
+    border-radius: var(--radius);
+    padding: 2.5rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .drop-zone:hover { border-color: var(--green-mid); background: var(--green-dim); }
+  .drop-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+  .drop-icon { font-size: 2rem; margin-bottom: 0.75rem; opacity: 0.6; }
+  .drop-title { font-size: 0.95rem; font-weight: 500; margin-bottom: 0.35rem; }
+  .drop-sub { font-size: 0.8rem; color: var(--muted); font-family: var(--mono); }
+
+  .file-preview {
+    display: none;
+    align-items: center; gap: 12px;
+    background: var(--surface2); border-radius: var(--radius);
+    padding: 0.85rem 1rem; margin-top: 1rem;
+    border: 1px solid var(--border);
+  }
+  .file-preview.show { display: flex; }
+  .file-icon { font-size: 1.4rem; }
+  .file-meta { flex: 1; }
+  .file-name { font-family: var(--mono); font-size: 0.85rem; font-weight: 500; color: var(--green); }
+  .file-size { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+  .file-remove { cursor: pointer; color: var(--muted); font-size: 1.1rem; transition: color 0.15s; padding: 4px; }
+  .file-remove:hover { color: var(--red); }
+
+  .scan-btn {
+    width: 100%; padding: 0.85rem;
+    background: var(--green); color: #0b0d12;
+    border: none; border-radius: var(--radius);
+    font-family: var(--mono); font-size: 0.9rem; font-weight: 600;
+    letter-spacing: 0.05em; cursor: pointer;
+    margin-top: 1.25rem;
+    transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .scan-btn:hover { background: #00e07a; transform: translateY(-1px); }
+  .scan-btn:active { transform: translateY(0); }
+  .scan-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  /* ── Progress ── */
+  .progress-wrap { margin-top: 1.25rem; display: none; }
+  .progress-wrap.show { display: block; }
+  .progress-label { font-family: var(--mono); font-size: 0.78rem; color: var(--muted); margin-bottom: 8px; display: flex; justify-content: space-between; }
+  .progress-bar { height: 3px; background: var(--surface2); border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--green); width: 0%; transition: width 0.4s ease; border-radius: 2px; }
+  @keyframes scanning { 0%{width:5%} 30%{width:45%} 70%{width:80%} 90%{width:92%} }
+  .progress-fill.scanning { animation: scanning 2s ease forwards; }
+
+  /* ── Error ── */
+  .error-box {
+    display: none;
+    background: var(--red-dim); border: 1px solid rgba(255,69,96,0.3);
+    border-radius: var(--radius); padding: 0.85rem 1rem;
+    font-family: var(--mono); font-size: 0.82rem; color: var(--red);
+    margin-top: 1rem; align-items: center; gap: 8px;
+  }
+  .error-box.show { display: flex; }
+
+  /* ── Results ── */
+  #results-section { display: none; }
+  #results-section.show { display: block; }
+
+  /* Summary Bar */
+  .summary-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 1.25rem; flex-wrap: wrap; gap: 12px;
+  }
+  .summary-title { font-family: var(--mono); font-size: 0.9rem; font-weight: 600; }
+  .summary-title span { color: var(--green); }
+
+  .risk-badge {
+    font-family: var(--mono); font-size: 0.75rem; font-weight: 600;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 5px 14px; border-radius: 20px;
+  }
+  .risk-badge.clean  { background: var(--green-dim); color: var(--green); border: 1px solid var(--green-mid); }
+  .risk-badge.low    { background: var(--blue-dim);   color: var(--blue); border: 1px solid rgba(77,166,255,0.3); }
+  .risk-badge.medium { background: var(--yellow-dim); color: var(--yellow); border: 1px solid rgba(255,209,102,0.3); }
+  .risk-badge.high   { background: var(--orange-dim); color: var(--orange); border: 1px solid rgba(255,155,61,0.3); }
+  .risk-badge.critical { background: var(--red-dim); color: var(--red); border: 1px solid rgba(255,69,96,0.3); }
+
+  /* Stat Cards */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px; margin-bottom: 1.5rem;
+  }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1rem 1.1rem;
+    position: relative; overflow: hidden;
+  }
+  .stat-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0;
+    height: 2px; border-radius: 2px 2px 0 0;
+  }
+  .stat-card.total::before  { background: var(--purple); }
+  .stat-card.critical::before { background: var(--red); }
+  .stat-card.high::before   { background: var(--orange); }
+  .stat-card.medium::before { background: var(--yellow); }
+  .stat-card.low::before    { background: var(--blue); }
+  .stat-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; font-family: var(--mono); }
+  .stat-value { font-family: var(--mono); font-size: 1.8rem; font-weight: 600; margin: 4px 0 0; line-height: 1; }
+  .stat-card.total .stat-value  { color: var(--purple); }
+  .stat-card.critical .stat-value { color: var(--red); }
+  .stat-card.high .stat-value   { color: var(--orange); }
+  .stat-card.medium .stat-value { color: var(--yellow); }
+  .stat-card.low .stat-value    { color: var(--blue); }
+
+  /* File meta row */
+  .file-meta-row {
+    display: flex; gap: 1.5rem; flex-wrap: wrap;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 0.75rem 1rem;
+    margin-bottom: 1.5rem;
+    font-family: var(--mono); font-size: 0.78rem; color: var(--muted);
+  }
+  .file-meta-row .meta-item { display: flex; align-items: center; gap: 6px; }
+  .file-meta-row .meta-item strong { color: var(--text); }
+
+  /* Risk Meter */
+  .risk-meter-wrap { margin-bottom: 1.5rem; }
+  .risk-meter-label { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); margin-bottom: 6px; display: flex; justify-content: space-between; }
+  .risk-meter { height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+  .risk-meter-fill {
+    height: 100%; border-radius: 3px;
+    transition: width 1s cubic-bezier(0.34, 1.56, 0.64, 1);
+    background: linear-gradient(90deg, var(--green) 0%, var(--yellow) 50%, var(--red) 100%);
+  }
+
+  /* Findings Table */
+  .findings-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  .findings-toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.85rem 1rem; border-bottom: 1px solid var(--border);
+    gap: 10px; flex-wrap: wrap;
+  }
+  .findings-count { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); }
+  .filter-group { display: flex; gap: 6px; flex-wrap: wrap; }
+  .filter-btn {
+    font-family: var(--mono); font-size: 0.72rem;
+    padding: 4px 10px; border-radius: 20px; cursor: pointer;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--muted); transition: all 0.15s;
+  }
+  .filter-btn:hover, .filter-btn.active { color: var(--text); border-color: rgba(255,255,255,0.25); background: var(--surface2); }
+  .filter-btn[data-sev="critical"].active { color: var(--red); border-color: rgba(255,69,96,0.4); }
+  .filter-btn[data-sev="high"].active { color: var(--orange); border-color: rgba(255,155,61,0.4); }
+  .filter-btn[data-sev="medium"].active { color: var(--yellow); border-color: rgba(255,209,102,0.4); }
+  .filter-btn[data-sev="low"].active { color: var(--blue); border-color: rgba(77,166,255,0.4); }
+
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  thead tr { background: var(--surface2); }
+  th {
+    font-family: var(--mono); font-size: 0.68rem; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    padding: 0.65rem 1rem; text-align: left;
+    border-bottom: 1px solid var(--border);
+    font-weight: 500;
+  }
+  th:nth-child(1) { width: 110px; }
+  th:nth-child(2) { width: 55px; }
+  th:nth-child(3) { width: 80px; }
+  th:nth-child(4) { width: 120px; }
+  th:nth-child(5) { min-width: 0; }
+  th:nth-child(6) { width: 80px; }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.12s;
+    cursor: pointer;
+  }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: rgba(255,255,255,0.03); }
+  td { padding: 0.7rem 1rem; font-size: 0.82rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .sev-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-family: var(--mono); font-size: 0.68rem; font-weight: 600;
+    letter-spacing: 0.05em; text-transform: uppercase;
+    padding: 3px 9px; border-radius: 12px;
+  }
+  .sev-dot { width: 5px; height: 5px; border-radius: 50%; display: inline-block; }
+  .sev-pill.critical { background: var(--red-dim); color: var(--red); }
+  .sev-pill.critical .sev-dot { background: var(--red); }
+  .sev-pill.high { background: var(--orange-dim); color: var(--orange); }
+  .sev-pill.high .sev-dot { background: var(--orange); }
+  .sev-pill.medium { background: var(--yellow-dim); color: var(--yellow); }
+  .sev-pill.medium .sev-dot { background: var(--yellow); }
+  .sev-pill.low { background: var(--blue-dim); color: var(--blue); }
+  .sev-pill.low .sev-dot { background: var(--blue); }
+
+  .type-tag {
+    font-family: var(--mono); font-size: 0.72rem; color: var(--muted);
+    background: var(--surface2); padding: 2px 7px; border-radius: 4px;
+    border: 1px solid var(--border);
+    display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+  }
+  .line-num { font-family: var(--mono); font-size: 0.8rem; color: var(--purple); }
+  .redacted { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); }
+  .confidence-bar {
+    display: flex; align-items: center; gap: 6px;
+    font-family: var(--mono); font-size: 0.7rem; color: var(--muted);
+  }
+  .conf-track { flex: 1; height: 3px; background: var(--surface2); border-radius: 2px; }
+  .conf-fill { height: 100%; border-radius: 2px; background: var(--green); }
+
+  /* Clean state */
+  .clean-state {
+    text-align: center; padding: 3rem 2rem;
+    display: none;
+  }
+  .clean-state.show { display: block; }
+  .clean-icon { font-size: 3rem; margin-bottom: 1rem; }
+  .clean-title { font-size: 1.1rem; font-weight: 500; color: var(--green); margin-bottom: 0.5rem; }
+  .clean-sub { font-size: 0.85rem; color: var(--muted); }
+
+  /* Expanded row detail */
+  .detail-row { display: none; }
+  .detail-row.open { display: table-row; }
+  .detail-cell {
+    background: var(--surface2); padding: 0.75rem 1rem 0.75rem 2rem;
+    font-family: var(--mono); font-size: 0.78rem; color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  .detail-cell .detail-content { display: flex; gap: 2rem; flex-wrap: wrap; }
+  .detail-cell .detail-item { min-width: 120px; }
+  .detail-cell .detail-item label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; display: block; margin-bottom: 2px; }
+  .detail-cell .detail-item value { color: var(--text); }
+
+  /* Scrollable table */
+  .table-scroll { overflow-x: auto; }
+
+  /* Categories breakdown */
+  .categories-section { margin-top: 1.5rem; }
+  .categories-title { font-family: var(--mono); font-size: 0.78rem; color: var(--muted); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.08em; }
+  .cat-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .cat-chip {
+    display: flex; align-items: center; gap: 7px;
+    font-family: var(--mono); font-size: 0.75rem;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 5px 10px;
+  }
+  .cat-count {
+    background: var(--green-dim); color: var(--green);
+    border-radius: 10px; padding: 1px 7px; font-size: 0.7rem; font-weight: 600;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🔍</div>
+      <div>
+        <div class="logo-text"><span>secret</span>scan</div>
+        <div class="logo-sub">secrets detection engine</div>
+      </div>
+    </div>
+    <div class="version-badge">v2.0 · AI-enhanced</div>
+  </header>
+
+  <div class="hero">
+    <h1>Detect <strong>secrets & credentials</strong><br>hiding in your codebase</h1>
+    <p>Upload any source file or config. We scan for API keys, tokens, passwords, and cryptographic material using 19 regex patterns + ML anomaly detection.</p>
+  </div>
+
+  <div class="upload-card" id="uploadCard">
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="fileInput" accept=".py,.js,.ts,.env,.json,.yaml,.yml,.txt,.sh,.bash,.conf,.cfg,.ini,.toml,.rb,.php,.go,.rs,.java,.cs,.cpp,.c,.tf,.hcl,.xml,.properties,.dockerfile">
+      <div class="drop-icon">📂</div>
+      <div class="drop-title">Drop your file here or click to browse</div>
+      <div class="drop-sub">.py .js .env .yaml .json .sh .tf + more · max 10MB</div>
+    </div>
+
+    <div class="file-preview" id="filePreview">
+      <div class="file-icon" id="previewIcon">📄</div>
+      <div class="file-meta">
+        <div class="file-name" id="previewName">—</div>
+        <div class="file-size" id="previewSize">—</div>
+      </div>
+      <div class="file-remove" id="removeFile" title="Remove file">✕</div>
+    </div>
+
+    <button class="scan-btn" id="scanBtn" disabled>
+      <span id="scanBtnText">▶ RUN SCAN</span>
+    </button>
+
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-label">
+        <span id="progressLabel">Initialising scanner…</span>
+        <span id="progressPct">0%</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+
+    <div class="error-box" id="errorBox">
+      <span>⚠</span>
+      <span id="errorText">An error occurred.</span>
+    </div>
+  </div>
+
+  <div id="results-section">
+    <div class="summary-header">
+      <div class="summary-title">scan results · <span id="scanFilename"></span></div>
+      <div class="risk-badge" id="riskBadge">—</div>
+    </div>
+
+    <div class="file-meta-row" id="fileMetaRow">
+      <div class="meta-item">📁 <strong id="metaFilename">—</strong></div>
+      <div class="meta-item">⚖️ <strong id="metaSize">—</strong></div>
+      <div class="meta-item">🔢 <strong id="metaFindings">—</strong> findings</div>
+      <div class="meta-item">🎯 risk score: <strong id="metaRisk">—</strong>/100</div>
+    </div>
+
+    <div class="risk-meter-wrap">
+      <div class="risk-meter-label">
+        <span>risk level</span>
+        <span id="riskScore">0 / 100</span>
+      </div>
+      <div class="risk-meter"><div class="risk-meter-fill" id="riskFill" style="width:0%"></div></div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card total">
+        <div class="stat-label">Total</div>
+        <div class="stat-value" id="statTotal">0</div>
+      </div>
+      <div class="stat-card critical">
+        <div class="stat-label">Critical</div>
+        <div class="stat-value" id="statCritical">0</div>
+      </div>
+      <div class="stat-card high">
+        <div class="stat-label">High</div>
+        <div class="stat-value" id="statHigh">0</div>
+      </div>
+      <div class="stat-card medium">
+        <div class="stat-label">Medium</div>
+        <div class="stat-value" id="statMedium">0</div>
+      </div>
+      <div class="stat-card low">
+        <div class="stat-label">Low</div>
+        <div class="stat-value" id="statLow">0</div>
+      </div>
+    </div>
+
+    <div class="findings-wrap" id="findingsWrap">
+      <div class="findings-toolbar">
+        <span class="findings-count" id="findingsCount">0 findings</span>
+        <div class="filter-group" id="filterGroup">
+          <button class="filter-btn active" data-sev="all">All</button>
+          <button class="filter-btn" data-sev="critical">Critical</button>
+          <button class="filter-btn" data-sev="high">High</button>
+          <button class="filter-btn" data-sev="medium">Medium</button>
+          <button class="filter-btn" data-sev="low">Low</button>
+        </div>
+      </div>
+
+      <div class="clean-state" id="cleanState">
+        <div class="clean-icon">✅</div>
+        <div class="clean-title">No secrets detected</div>
+        <div class="clean-sub">This file appears clean. No matching patterns or anomalies found.</div>
+      </div>
+
+      <div class="table-scroll" id="tableWrap">
+        <table id="findingsTable">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Line</th>
+              <th>Severity</th>
+              <th>Category</th>
+              <th>Redacted Value</th>
+              <th>Confidence</th>
+            </tr>
+          </thead>
+          <tbody id="findingsTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="categories-section" id="categoriesSection" style="display:none;">
+      <div class="categories-title">Finding categories</div>
+      <div class="cat-list" id="catList"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const fileInput  = document.getElementById('fileInput');
+const dropZone   = document.getElementById('dropZone');
+const filePreview= document.getElementById('filePreview');
+const previewName= document.getElementById('previewName');
+const previewSize= document.getElementById('previewSize');
+const previewIcon= document.getElementById('previewIcon');
+const removeFile = document.getElementById('removeFile');
+const scanBtn    = document.getElementById('scanBtn');
+const scanBtnText= document.getElementById('scanBtnText');
+const progressWrap = document.getElementById('progressWrap');
+const progressFill = document.getElementById('progressFill');
+const progressLabel= document.getElementById('progressLabel');
+const progressPct  = document.getElementById('progressPct');
+const errorBox   = document.getElementById('errorBox');
+const errorText  = document.getElementById('errorText');
+const resultsSection = document.getElementById('results-section');
+const uploadCard = document.getElementById('uploadCard');
+
+const EXT_ICONS = {
+  py:'🐍', js:'🟨', ts:'🔷', json:'📋', env:'🔐', yaml:'📝', yml:'📝',
+  sh:'💻', bash:'💻', tf:'🌍', go:'🐹', rb:'💎', php:'🐘', rs:'🦀',
+  java:'☕', cs:'#️⃣', cpp:'⚙️', c:'⚙️', xml:'📄', toml:'📝', ini:'📝',
+  conf:'⚙️', cfg:'⚙️', txt:'📃', dockerfile:'🐳', hcl:'🌍', properties:'⚙️'
+};
+
+let selectedFile = null;
+let activeFilter = 'all';
+let allFindings  = [];
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes/1024).toFixed(1) + ' KB';
+  return (bytes/1048576).toFixed(2) + ' MB';
+}
+
+function getExt(name) { return name.split('.').pop().toLowerCase(); }
+
+function setFile(file) {
+  selectedFile = file;
+  const ext = getExt(file.name);
+  previewIcon.textContent = EXT_ICONS[ext] || '📄';
+  previewName.textContent = file.name;
+  previewSize.textContent = formatBytes(file.size) + ' · .' + ext;
+  filePreview.classList.add('show');
+  scanBtn.disabled = false;
+  clearError();
+}
+
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) setFile(fileInput.files[0]); });
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); uploadCard.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => uploadCard.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadCard.classList.remove('dragover');
+  if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+});
+
+removeFile.addEventListener('click', () => {
+  selectedFile = null;
+  fileInput.value = '';
+  filePreview.classList.remove('show');
+  scanBtn.disabled = true;
+});
+
+function clearError() { errorBox.classList.remove('show'); }
+function showError(msg) {
+  errorText.textContent = msg;
+  errorBox.classList.add('show');
+}
+
+function showProgress(label, pct) {
+  progressWrap.classList.add('show');
+  progressLabel.textContent = label;
+  progressPct.textContent = pct + '%';
+  progressFill.style.width = pct + '%';
+}
+
+function resetProgress() {
+  progressFill.style.width = '0%';
+  progressFill.classList.remove('scanning');
+}
+
+scanBtn.addEventListener('click', async () => {
+  if (!selectedFile) return;
+  clearError();
+  resetProgress();
+  scanBtn.disabled = true;
+  scanBtnText.textContent = '⏳ SCANNING…';
+  showProgress('Uploading file…', 10);
+
+  const formData = new FormData();
+  formData.append('file', selectedFile);
+
+  progressFill.classList.add('scanning');
+  showProgress('Running pattern engine…', 35);
+
+  try {
+    const res = await fetch('/scan', { method: 'POST', body: formData });
+    progressFill.classList.remove('scanning');
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Server error ' + res.status }));
+      throw new Error(err.error || 'Scan failed');
+    }
+
+    showProgress('Parsing results…', 95);
+    const data = await res.json();
+    showProgress('Done', 100);
+
+    await new Promise(r => setTimeout(r, 400));
+    renderResults(data);
+
+  } catch (err) {
+    showError(err.message);
+    progressWrap.classList.remove('show');
+  } finally {
+    scanBtn.disabled = false;
+    scanBtnText.textContent = '▶ RUN SCAN';
+  }
+});
+
+function renderResults(data) {
+  allFindings = data.findings || [];
+  const s = data.summary || {};
+  const rl = data.risk_level || 'clean';
+  const rs = data.risk_score || 0;
+
+  document.getElementById('scanFilename').textContent = data.filename || '—';
+  document.getElementById('metaFilename').textContent = data.filename || '—';
+  document.getElementById('metaSize').textContent = formatBytes(data.file_size || 0);
+  document.getElementById('metaFindings').textContent = s.total || 0;
+  document.getElementById('metaRisk').textContent = rs;
+
+  const badge = document.getElementById('riskBadge');
+  badge.className = 'risk-badge ' + rl;
+  badge.textContent = rl.toUpperCase();
+
+  document.getElementById('riskScore').textContent = rs + ' / 100';
+  setTimeout(() => { document.getElementById('riskFill').style.width = Math.min(rs, 100) + '%'; }, 100);
+
+  document.getElementById('statTotal').textContent    = s.total || 0;
+  document.getElementById('statCritical').textContent = s.critical || 0;
+  document.getElementById('statHigh').textContent     = s.high || 0;
+  document.getElementById('statMedium').textContent   = s.medium || 0;
+  document.getElementById('statLow').textContent      = s.low || 0;
+
+  renderCategories(s.categories || {});
+  renderTable(allFindings);
+
+  resultsSection.classList.add('show');
+  resultsSection.style.display = 'block';
+  resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderCategories(cats) {
+  const sec = document.getElementById('categoriesSection');
+  const list = document.getElementById('catList');
+  list.innerHTML = '';
+  const entries = Object.entries(cats);
+  if (!entries.length) { sec.style.display = 'none'; return; }
+  entries.sort((a,b) => b[1]-a[1]).forEach(([name, count]) => {
+    const chip = document.createElement('div');
+    chip.className = 'cat-chip';
+    chip.innerHTML = `${name} <span class="cat-count">${count}</span>`;
+    list.appendChild(chip);
+  });
+  sec.style.display = 'block';
+}
+
+function renderTable(findings) {
+  const tbody = document.getElementById('findingsTbody');
+  const clean = document.getElementById('cleanState');
+  const tableWrap = document.getElementById('tableWrap');
+  const countEl = document.getElementById('findingsCount');
+
+  const filtered = activeFilter === 'all' ? findings : findings.filter(f => f.severity === activeFilter);
+  countEl.textContent = filtered.length + ' finding' + (filtered.length !== 1 ? 's' : '');
+  tbody.innerHTML = '';
+
+  if (!filtered.length) {
+    tableWrap.style.display = 'none';
+    clean.classList.add('show');
+    return;
+  }
+  tableWrap.style.display = 'block';
+  clean.classList.remove('show');
+
+  filtered.forEach((f, i) => {
+    const conf = f.confidence != null ? f.confidence : null;
+    const confDisplay = conf != null
+      ? `<div class="confidence-bar">
+           <div class="conf-track"><div class="conf-fill" style="width:${conf}%"></div></div>
+           <span>${conf.toFixed(0)}%</span>
+         </div>`
+      : `<span style="color:var(--muted);font-size:0.72rem;font-family:var(--mono)">regex</span>`;
+
+    const tr = document.createElement('tr');
+    tr.dataset.idx = i;
+    tr.innerHTML = `
+      <td><span class="type-tag" title="${f.secret_type}">${f.secret_type}</span></td>
+      <td><span class="line-num">${f.line_number}</span></td>
+      <td><span class="sev-pill ${f.severity}"><span class="sev-dot"></span>${f.severity}</span></td>
+      <td style="font-size:0.78rem;color:var(--muted)">${f.category}</td>
+      <td><span class="redacted">${f.redacted_content}</span></td>
+      <td>${confDisplay}</td>
+    `;
+
+    const detailRow = document.createElement('tr');
+    detailRow.className = 'detail-row';
+    detailRow.innerHTML = `
+      <td colspan="6" class="detail-cell">
+        <div class="detail-content">
+          <div class="detail-item"><label>File</label><value>${f.filename}</value></div>
+          <div class="detail-item"><label>Fingerprint</label><value>${f.fingerprint}</value></div>
+          <div class="detail-item"><label>Detection</label><value>${f.confidence != null ? 'ML model' : 'Regex pattern'}</value></div>
+          <div class="detail-item"><label>Category</label><value>${f.category}</value></div>
+        </div>
+      </td>`;
+
+    tr.addEventListener('click', () => {
+      const open = detailRow.classList.contains('open');
+      document.querySelectorAll('.detail-row.open').forEach(r => r.classList.remove('open'));
+      if (!open) detailRow.classList.add('open');
+    });
+
+    tbody.appendChild(tr);
+    tbody.appendChild(detailRow);
+  });
+}
+
+document.getElementById('filterGroup').addEventListener('click', e => {
+  const btn = e.target.closest('.filter-btn');
+  if (!btn) return;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  activeFilter = btn.dataset.sev;
+  renderTable(allFindings);
+});
+</script>
+</body>
+</html>

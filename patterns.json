@@ -1,0 +1,22 @@
+{
+  "AWS Access Key": "AKIA[0-9A-Z]{16}",
+  "AWS Secret Key": "(?i)aws_secret_access_key\\s*[:=]\\s*[A-Za-z0-9/+=]{40}",
+  "GitHub Token": "ghp_[A-Za-z0-9]{36}",
+  "GitHub OAuth Token": "gho_[A-Za-z0-9]{36}",
+  "Slack Token": "xox[baprs]-([0-9a-zA-Z]{10,48})",
+  "Stripe Secret Key": "sk_live_[0-9a-zA-Z]{24,34}",
+  "Stripe Publishable Key": "pk_live_[0-9a-zA-Z]{24,34}",
+  "Google API Key": "AIza[0-9A-Za-z\\-_]{35}",
+  "Twilio API Key": "SK[0-9a-fA-F]{32}",
+  "SendGrid API Key": "SG\\.[a-zA-Z0-9_-]{22}\\.[a-zA-Z0-9_-]{43}",
+  "Private Key Block": "-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----",
+  "JWT Token": "eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}",
+  "Password in Config": "(?i)(password|passwd|pwd)\\s*[:=]\\s*['\"]?.{4,}",
+  "Database URL": "(?i)(mysql|postgresql|mongodb|redis):\\/\\/[^\\s]+",
+  "Email Address": "[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+",
+  "IPv4 Address": "\\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\b",
+  "Bearer Token": "(?i)bearer\\s+[A-Za-z0-9\\-._~+/]+=*",
+  "Generic Secret": "(?i)(secret|api_key|apikey|token|auth)\\s*[:=]\\s*['\"]?[A-Za-z0-9_\\-]{8,}",
+  "SSH Private Key": "-----BEGIN OPENSSH PRIVATE KEY-----",
+  "Heroku API Key": "[hH]eroku[a-zA-Z0-9]{32}"
+}
